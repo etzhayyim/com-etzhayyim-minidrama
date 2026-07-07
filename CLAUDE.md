@@ -1,0 +1,31 @@
+# com-etzhayyim-minidrama
+
+minidrama (ミニドラマ座) — 縦型ミニドラマ制作 actor。core contract は
+`README.md`、pattern は full-repo `../../../CLAUDE.md` "Actors" 節
+（containment + independent governor + append-only ledger）。
+Superproject decision record:
+`../../../90-docs/adr/2607071300-aozora-creator-actors-minidrama.md`（Part 2）。
+Design 正本: `docs/adr/0001-architecture.md`。
+
+## Invariant
+
+minidrama は DramaGovernor が拒否したプランを NEVER commit / announce する。
+over-duration(>120s) / too-many-shots(>24) / overlong-shot(>10s) /
+content-veto(Rider §2) / likeness / unprovenanced-asset / budget-exceeded /
+rate-limited は HELD — append-only 台帳に hold として記録され、SSoT には
+書かれない。`:commit` だけが Store 書込 + announce を行い、全 commit/hold は
+不変の台帳 fact。**public announcement (phase 2) は run context の
+`:approvals #{:publish}`（per-episode human sign-off）が無い限り行わない**
+（ADR-2607071300 gate ④ — 完全自律 publisher 群 (ADR-2606281500) とは
+minidrama 自身の ADR が意図的に differ）。unlisted (phase 1) までは自動可。
+low-confidence は block せず `:low-confidence` タグで commit（透明性）。
+生成・合成はこの actor に実装しない — committed plan は genapp-clj 系
+video エンジン（dougaka エンジン）への発注書。
+
+## Conventions
+
+- `.cljc` for anything portable (operation/governor/advisor/publisher/phase/
+  store/sim) — `.clj` は JVM-only I/O（将来の cacao / aozora publisher）のみ。
+- actor 自身の Ed25519 identity は `.minidrama/identity.edn`（gitignored）—
+  NEVER commit a private key。
+- `clojure -M:lint`（clj-kondo, errors fail）/ `clojure -M:dev:test`。

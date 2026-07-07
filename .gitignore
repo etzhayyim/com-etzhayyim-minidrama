@@ -1,0 +1,6 @@
+.cpcache/
+.nrepl-port
+/target
+/classes
+# the actor's own Ed25519 identity — never commit a private key
+.minidrama/

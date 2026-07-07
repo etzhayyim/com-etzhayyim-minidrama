@@ -1,0 +1,74 @@
+# com-etzhayyim-minidrama (ミニドラマ座)
+
+縦型（720x1280）60〜90 秒ミニドラマの制作 actor。企画 → 脚本 → 絵コンテ
+（shot list）までを DramaLLM が *proposal* として提案し、**DramaGovernor が
+検閲**して可決分だけを append-only 台帳に commit する。可決済みプランは
+genapp-clj 系 video エンジン（dougaka エンジン、follow-up）への work order
+であり、公開は app-aozora `/videos`（`app.aozora.embed.video`、
+ADR-2607071000/2607071100 経路）。
+
+設計 正本: superproject
+`90-docs/adr/2607071300-aozora-creator-actors-minidrama.md`（Part 2）。
+actor identity: `minidrama.aozora.app`（projected、`aozora.appview.creator-actors`
+registry — 鍵付き化は follow-up）。
+
+## Overview
+
+```
+theme ──▶ :advise (DramaLLM, sealed) ──▶ :govern (DramaGovernor) ──▶ :decide
+                                                        │
+                :commit ◀── clean ──────────────────────┴── HARD ──▶ :hold
+                  │  SSoT (episode plan) + ledger              ledger only
+                  └─ phase/approval gate ──▶ Publisher (announce)
+```
+
+## StateGraph (one episode plan = one run)
+
+`minidrama.operation/build` — intake → advise → govern → decide →
+commit | hold。無限内部ループ無し。生成・合成はこの graph に含めない
+（committed plan がエンジンへの発注書）。
+
+## DramaGovernor gates (ADR-2607071300)
+
+HARD → HOLD（台帳に記録、commit も announce もしない）:
+`:no-actuation` `:over-duration`(>120s) `:too-many-shots`(>24)
+`:overlong-shot`(>10s) `:content-veto`(Rider §2) `:likeness`
+`:unprovenanced-asset` `:budget-exceeded` `:rate-limited`
+
+SOFT → commit + タグ: `:low-confidence`
+
+## Phase rollout
+
+| phase | label | announce |
+|---|---|---|
+| 0 (default) | draft | しない（台帳のみ） |
+| 1 | unlisted | 自動（unlisted preview、ADR の「unlisted までは自動可」） |
+| 2 | public | **`:approvals #{:publish}` がある run だけ**（per-episode human sign-off） |
+
+## Injected seams (each a swap, core unchanged)
+
+- **Store** — `MemStore`（既定）‖ `DatomicStore`（langchain.db `:db-api`、
+  kotoba-server pod へも同 record で接続可）
+- **Advisor** — `mock-advisor`（既定、決定的）‖ `llm-advisor`
+  （`langchain.model` ChatModel、Murakumo fleet 限定 `assert-murakumo!`）
+- **Publisher** — `MockPublisher`（既定）‖ 実 app-aozora createRecord
+  （follow-up、tashikame.aozora 同型）
+- **Phase / approvals / budget / daily-cap** — run の `:context`
+
+## Run
+
+```bash
+clojure -M:lint       # clj-kondo (errors fail)
+clojure -M:dev:test   # cognitect test-runner
+clojure -M:dev:run    # offline demo (mock advisor/publisher, MemStore)
+```
+
+## Related files
+
+- `src/minidrama/operation.cljc` — StateGraph
+- `src/minidrama/governor.cljc` — DramaGovernor
+- `src/minidrama/advisor.cljc` — DramaLLM (mock ‖ Murakumo LLM)
+- `src/minidrama/store.cljc` — Store (MemStore ‖ DatomicStore)
+- `src/minidrama/publisher.cljc` — Publisher (Mock ‖ aozora follow-up)
+- `src/minidrama/phase.cljc` — phase 0 draft / 1 unlisted / 2 public+approval
+- `docs/adr/0001-architecture.md` — repo-local design note

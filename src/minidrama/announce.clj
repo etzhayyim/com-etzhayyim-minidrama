@@ -26,14 +26,16 @@
 
 (defn upload-blob!
   "POST the mp4 bytes to com.atproto.repo.uploadBlob → {:blob ref}. Raw-body
-  JDK http (the JSON http-fn can't carry binary)."
-  [{:keys [pds path mime] :or {pds default-pds mime "video/mp4"}}]
+  JDK http (the JSON http-fn can't carry binary). `jwt` (session JWT) is
+  required by the PDS when PDS_REQUIRE_AUTH=1 (ADR-2607071000 follow-up)."
+  [{:keys [pds path mime jwt] :or {pds default-pds mime "video/mp4"}}]
   (let [bytes (with-open [in (io/input-stream path)
                           out (java.io.ByteArrayOutputStream.)]
                 (io/copy in out)
                 (.toByteArray out))
         req (-> (HttpRequest/newBuilder (URI/create (str pds "/xrpc/com.atproto.repo.uploadBlob")))
                 (.header "Content-Type" mime)
+                (cond-> jwt (.header "Authorization" (str "Bearer " jwt)))
                 (.method "POST" (HttpRequest$BodyPublishers/ofByteArray bytes))
                 (.build))
         resp (.send (HttpClient/newHttpClient) req (HttpResponse$BodyHandlers/ofString))]
@@ -65,7 +67,10 @@
   Returns {:blob-cid :post {:uri :cid}}."
   [{:keys [pds identity path episode-id title text]
     :or {pds default-pds}}]
-  (let [{:keys [blob]} (upload-blob! {:pds pds :path path})
+  (let [jwt (aozora/session-jwt! {:pds pds :identity identity
+                                  :json-write json/write-str
+                                  :json-read json/read-str})
+        {:keys [blob]} (upload-blob! {:pds pds :path path :jwt jwt})
         pub (aozora/aozora-publisher {:pds pds :identity identity
                                       :json-write json/write-str
                                       :json-read json/read-str})

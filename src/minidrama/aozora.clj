@@ -40,6 +40,31 @@
           resp (.send (HttpClient/newHttpClient) req (HttpResponse$BodyHandlers/ofString))]
       {:status (.statusCode resp) :body (.body resp)})))
 
+(defn session-jwt!
+  "app-aozora-pds auth (self-sovereign CACAO, ADR-2606251700): mint a CACAO
+  for the actor's OWN did:key, exchange it at createSession for an HS256
+  session JWT — the PDS enforces session DID == repo DID, and uploadBlob
+  requires a valid session when PDS_REQUIRE_AUTH=1 (ADR-2607071000 follow-up)."
+  [{:keys [pds identity json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (let [now   (str (Instant/now))
+        graph (cacao/canonical-graph (:did identity) cacao/default-db-name)
+        cacao (cacao/mint identity
+                          {:cap :cap/transact :scope graph}
+                          {:aud pds :nonce (str (UUID/randomUUID))
+                           :issued-at now
+                           :expiry (str (.plusSeconds (Instant/now) 3600))})
+        sess  (http-fn {:url     (str pds "/xrpc/com.atproto.server.createSession")
+                        :method  :post
+                        :headers {"Content-Type" "application/json"}
+                        :body    (json-write {:cacao cacao})})
+        sbody (json-read (:body sess))
+        jwt   (get sbody "accessJwt")]
+    (when-not (and (= 200 (:status sess)) jwt)
+      (throw (ex-info "aozora createSession failed"
+                      {:status (:status sess) :body (:body sess)})))
+    jwt))
+
 (defn aozora-publisher
   "Returns a `minidrama.publisher/Publisher` that creates episode records on
   the aozora PDS. opts:
@@ -54,41 +79,25 @@
   (assert json-read  ":json-read fn is required (e.g. clojure.data.json/read-str)")
   (reify publisher/Publisher
     (publish! [_ record]
-      ;; app-aozora-pds auth (self-sovereign CACAO, ADR-2606251700): mint a
-      ;; CACAO for the actor's OWN did:key, exchange it at createSession for an
-      ;; HS256 session JWT, then createRecord with that JWT — the PDS enforces
-      ;; session DID == repo DID, so the repo is addressed by the actor's did:key.
-      (let [now   (str (Instant/now))
-            graph (cacao/canonical-graph (:did identity) cacao/default-db-name)
-            cacao (cacao/mint identity
-                              {:cap :cap/transact :scope graph}
-                              {:aud pds :nonce (str (UUID/randomUUID))
-                               :issued-at now
-                               :expiry (str (.plusSeconds (Instant/now) 3600))})
-            sess  (http-fn {:url     (str pds "/xrpc/com.atproto.server.createSession")
-                            :method  :post
-                            :headers {"Content-Type" "application/json"}
-                            :body    (json-write {:cacao cacao})})
-            sbody (json-read (:body sess))
-            jwt   (get sbody "accessJwt")]
-        (when-not (and (= 200 (:status sess)) jwt)
-          (throw (ex-info "aozora createSession failed"
-                          {:status (:status sess) :body (:body sess)})))
-        (let [coll  (or (:collection record) publisher/collection)
-              rec   (-> (dissoc record :rkey :collection)
+      (let [now (str (Instant/now))
+            jwt (session-jwt! {:pds pds :identity identity
+                               :json-write json-write :json-read json-read
+                               :http-fn http-fn})
+            coll  (or (:collection record) publisher/collection)
+            rec   (-> (dissoc record :rkey :collection)
                         (assoc :createdAt now :actor (:did identity)))
-              resp  (http-fn {:url     (str pds "/xrpc/com.atproto.repo.createRecord")
-                              :method  :post
-                              :headers {"Content-Type" "application/json"
-                                        "Authorization" (str "Bearer " jwt)}
-                              :body    (json-write {:repo       (:did identity)
-                                                    :collection coll
-                                                    :rkey       (or (:rkey record)
-                                                                    (:episode-id record)
-                                                                    "self")
-                                                    :record     rec})})
-              rbody (json-read (:body resp))]
+            resp  (http-fn {:url     (str pds "/xrpc/com.atproto.repo.createRecord")
+                            :method  :post
+                            :headers {"Content-Type" "application/json"
+                                      "Authorization" (str "Bearer " jwt)}
+                            :body    (json-write {:repo       (:did identity)
+                                                  :collection coll
+                                                  :rkey       (or (:rkey record)
+                                                                  (:episode-id record)
+                                                                  "self")
+                                                  :record     rec})})
+            rbody (json-read (:body resp))]
           (when-not (= 200 (:status resp))
             (throw (ex-info "aozora createRecord failed"
                             {:status (:status resp) :body (:body resp)})))
-          {:uri (get rbody "uri") :cid (get rbody "cid")})))))
+          {:uri (get rbody "uri") :cid (get rbody "cid")}))))

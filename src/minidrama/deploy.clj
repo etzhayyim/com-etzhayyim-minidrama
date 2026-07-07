@@ -13,6 +13,7 @@
   Usage: clojure -M:dev -m minidrama.deploy \"<theme>\" [duration-seconds]
          clojure -M:dev -m minidrama.deploy identify-live
          clojure -M:dev -m minidrama.deploy register-handle
+         clojure -M:dev -m minidrama.deploy create-account
   Env:   MINIDRAMA_OLLAMA_URL (default http://127.0.0.1:11434)
          MINIDRAMA_OLLAMA_MODEL (default gemma-4-E4B qat)"
   (:require [clojure.data.json :as json]
@@ -109,10 +110,30 @@
       (catch Exception e
         (println "FAILED:" (ex-message e) (pr-str (ex-data e)))))))
 
+(defn create-account
+  "createAccount 昇格 (ADR-2607071700 follow-up): persist the actor's
+  `:atproto.account/*` datom on the PDS with a fresh self-CACAO proof, so
+  getAccount answers for minidrama.aozora.app (account-store 整合).
+  clojure -M:dev -m minidrama.deploy create-account"
+  []
+  (let [id (cacao/load-or-create-identity! ".minidrama/identity.edn")]
+    (println "actor did:key :" (:did id))
+    (println "createAccount minidrama.aozora.app @ pds.aozora.app")
+    (try
+      (let [r (aozora/create-account! {:pds        "https://pds.aozora.app"
+                                       :identity   id
+                                       :handle     "minidrama.aozora.app"
+                                       :json-write json/write-str
+                                       :json-read  json/read-str})]
+        (println "ACCOUNT:" r))
+      (catch Exception e
+        (println "FAILED:" (ex-message e) (pr-str (ex-data e)))))))
+
 (defn -main
   [& args]
   (when (= (first args) "identify-live") (identify-live) (System/exit 0))
   (when (= (first args) "register-handle") (register-handle) (System/exit 0))
+  (when (= (first args) "create-account") (create-account) (System/exit 0))
   (let [[theme dur] (if (seq args) args ["終電を逃した二人の五分間" nil])
         chat    (ollama-chat-model)
         adv     (advisor/llm-advisor chat {:max-tokens 1024})

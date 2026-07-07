@@ -1,0 +1,40 @@
+;; minidrama.app.edn — KOTOBA Mesh application manifest for the minidrama
+;; actor's ON-MESH surface (kenchi-valuation 同型, see ../docs and
+;; ADR-2607071500 in the superproject). murakumo.app.edn references this as a
+;; fleet app; `kotoba app deploy mesh/minidrama.app.edn --publish --url
+;; http://node:8080` compiles each :src to a CID and announces the
+;; triggers/routes to a node.
+;;
+;; SPLIT OF DUTIES (kenchi §6 と同じ分業):
+;;   - The DRAMA PIPELINE (DramaLLM proposal → DramaGovernor → ledger →
+;;     generate/assemble → aozora publish) runs OFF-MESH on the JVM actor
+;;     (minidrama.operation / minidrama.publisher / minidrama.announce) —
+;;     LLM 呼び出し・動画生成・PDS 認証はこの mesh guest では行わない。
+;;   - THESE on-mesh components only PUBLISH the actor's identity/liveness and
+;;     SERVE its profile:
+;;       drama-profile    on-http  GET /minidrama/profile → the actor's
+;;                                 identity record (handle / did / registry)
+;;       drama-heartbeat  on-tick  assert resident-liveness datoms so the
+;;                                 fleet's Datom log carries an as-of history
+;;                                 that the actor is resident and reachable
+;;   This gives the actor 常駐 (LaunchAgent-hosted kotoba-server), p2p (the
+;;   gossipsub lattice places and re-places it), and HTTP reachability without
+;;   moving any governor-gated capability on-mesh.
+{:kotoba.app/name    "minidrama"
+ :kotoba.app/version "0.1.0"
+ :kotoba.app/components
+ [{:name     "drama-profile"
+   :src      "drama_profile.clj"            ; Clojure default → compiled to CID
+   :scale    1
+   :triggers [{:type :http :route "/minidrama/profile"}]
+   :requires #{:cap/kqe}}
+
+  {:name     "drama-heartbeat"
+   :src      "drama_heartbeat.clj"
+   :scale    1
+   :triggers [{:type :tick :every "1h"}]    ; periodic liveness assert
+   :requires #{:cap/kqe}}]
+
+ ;; Place on the JP edge tribe (same class murakumo's other mesh apps use).
+ :kotoba.app/placement {:spread  :zone
+                        :require {:tier "edge"}}}

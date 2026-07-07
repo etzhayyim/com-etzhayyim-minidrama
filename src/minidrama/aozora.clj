@@ -101,3 +101,29 @@
             (throw (ex-info "aozora createRecord failed"
                             {:status (:status resp) :body (:body resp)})))
           {:uri (get rbody "uri") :cid (get rbody "cid")}))))
+
+(defn register-handle!
+  "Bind the actor's aozora handle to its OWN did:key on the PDS
+  (com.atproto.identity.updateHandle — self-scoped: the authenticated session
+  DID claims its own handle, so only the key holder can bind it). This is the
+  keyed-flip step (ADR-2607070400 系列): after it, resolveHandle returns the
+  did:key instead of falling open to did:web:<handle>, and the appview
+  attributes the actor's real records to the friendly handle.
+  Returns {:handle :did}."
+  [{:keys [pds identity handle json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (assert (:did identity) ":identity with :did is required")
+  (assert handle ":handle is required")
+  (let [jwt  (session-jwt! {:pds pds :identity identity
+                            :json-write json-write :json-read json-read
+                            :http-fn http-fn})
+        resp (http-fn {:url     (str pds "/xrpc/com.atproto.identity.updateHandle")
+                       :method  :post
+                       :headers {"Content-Type" "application/json"
+                                 "Authorization" (str "Bearer " jwt)}
+                       :body    (json-write {:handle handle})})
+        body (json-read (:body resp))]
+    (when-not (= 200 (:status resp))
+      (throw (ex-info "aozora updateHandle failed"
+                      {:status (:status resp) :body (:body resp)})))
+    {:handle (get body "handle") :did (get body "did")}))

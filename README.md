@@ -61,6 +61,10 @@ SOFT → commit + タグ: `:low-confidence`
 clojure -M:lint       # clj-kondo (errors fail)
 clojure -M:dev:test   # cognitect test-runner
 clojure -M:dev:run    # offline demo (mock advisor/publisher, MemStore)
+
+# theme 一発でミニドラマを製造 (actor→dougaka engine→announce, ADR-2607071500):
+bb scripts/produce-episode.bb --theme "屋上のラジオ体操" --duration 48            # preview (mp4 まで)
+bb scripts/produce-episode.bb --theme "…" --announce   # 公開 = per-episode sign-off
 ```
 
 ## ON-MESH surface (reside facet, ADR-2607071500)

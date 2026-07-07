@@ -127,3 +127,33 @@
       (throw (ex-info "aozora updateHandle failed"
                       {:status (:status resp) :body (:body resp)})))
     {:handle (get body "handle") :did (get body "did")}))
+
+(defn create-account!
+  "com.atproto.server.createAccount — prove the actor's did:key via a fresh
+  self-sovereign CACAO and persist the `:atproto.account/*` (+ handle) datom
+  on the PDS. This is the account-store 整合 step of the keyed flip
+  (ADR-2607071700 follow-up; ADR-2607070400 系列の createAccount 昇格):
+  createSession/updateHandle already work keyless-store because the CACAO is
+  the proof, but a first-class account record makes getAccount answer for the
+  actor. Idempotent (re-transacting the account entity is a no-op upsert).
+  Returns {:did :handle}."
+  [{:keys [pds identity handle json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (assert (:did identity) ":identity with :did is required")
+  (assert handle ":handle is required")
+  (let [now   (str (Instant/now))
+        graph (cacao/canonical-graph (:did identity) cacao/default-db-name)
+        cacao (cacao/mint identity
+                          {:cap :cap/transact :scope graph}
+                          {:aud pds :nonce (str (UUID/randomUUID))
+                           :issued-at now
+                           :expiry (str (.plusSeconds (Instant/now) 3600))})
+        resp  (http-fn {:url     (str pds "/xrpc/com.atproto.server.createAccount")
+                        :method  :post
+                        :headers {"Content-Type" "application/json"}
+                        :body    (json-write {:handle handle :cacao cacao})})
+        body  (json-read (:body resp))]
+    (when-not (= 200 (:status resp))
+      (throw (ex-info "aozora createAccount failed"
+                      {:status (:status resp) :body (:body resp)})))
+    {:did (get body "did") :handle (get body "handle")}))

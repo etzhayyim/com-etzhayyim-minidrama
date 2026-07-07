@@ -33,13 +33,18 @@
       (System/exit exit))))
 
 (let [args *command-line-args*
-      theme (or (opt args "--theme")
+      plan-src (opt args "--plan")   ; episodes/<slug>.edn (実写カタログ設計)
+      theme (or (opt args "--theme") plan-src
                 (do (binding [*out* *err*]
-                      (println "usage: bb scripts/produce-episode.bb --theme \"…\" [--id …] [--duration 60] [--announce] [--title …]"))
+                      (println "usage: bb scripts/produce-episode.bb (--theme \"…\" | --plan episodes/x.edn) [--id …] [--duration 60] [--announce] [--title …]"))
                     (System/exit 1)))
-      id (or (opt args "--id") (str "ep-" (System/currentTimeMillis)))
+      id (or (opt args "--id")
+             (when plan-src (:episode-id (edn/read-string (slurp plan-src))))
+             (str "ep-" (System/currentTimeMillis)))
       duration (opt args "--duration")
-      title (or (opt args "--title") theme)
+      title (or (opt args "--title")
+                (when plan-src (:title (edn/read-string (slurp plan-src))))
+                theme)
       announce? (flag? args "--announce")
       here (str (fs/parent (fs/parent *file*)))          ; repo root
       dougaka (or (System/getenv "DOUGAKA_DIR")
@@ -47,8 +52,10 @@
       plan-file (str here "/.minidrama/episodes/" id ".edn")
       out-dir (str here "/.minidrama/episodes/" id)]
   (println "=== 1/3 plan (minidrama actor: DramaLLM ⊣ DramaGovernor) ===")
-  (run! here (cond-> ["clojure" "-M:dev" "-m" "minidrama.produce" theme id]
-               duration (conj duration)))
+  (run! here (if plan-src
+               ["clojure" "-M:dev" "-m" "minidrama.produce" "--from" plan-src]
+               (cond-> ["clojure" "-M:dev" "-m" "minidrama.produce" theme id]
+                 duration (conj duration))))
   (println "=== 2/3 produce (dougaka engine: keyframes → ffmpeg) ===")
   (run! dougaka ["clojure" "-M:dev" "-m" "dougaka.pipeline" plan-file out-dir])
   (let [mp4 (str out-dir "/" id ".mp4")]

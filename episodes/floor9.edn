@@ -1,0 +1,64 @@
+{:episode-id "floor9",
+ :title "9階で止まる",
+ :logline "残業帰りのエレベーターは、毎晩なぜか9階で止まる。9階は、空きフロアのはずだった。",
+ :genre "ソフトホラー",
+ :premise :live-action,
+ :duration-target 61,
+ :scenes
+ [{:seq 0,
+   :setting "オフィスビルのエレベーター・深夜",
+   :shots
+   [{:seq 0,
+     :duration 6,
+     :speaker :woman-30s,
+     :prompt
+     "vertical 9:16 live-action, office elevator interior at midnight, a tired woman in a suit watching floor numbers descend, cold fluorescent light, suspense framing",
+     :subtitle "また今日も、終電ギリギリ。"}
+    {:seq 1,
+     :duration 6,
+     :speaker :narrator-f,
+     :prompt
+     "vertical 9:16 live-action, close-up of elevator floor indicator stopping at 9, doors beginning to open onto a dark empty floor, horror tension",
+     :subtitle "9階。……誰も押してないのに。"}
+    {:seq 2,
+     :duration 7,
+     :speaker :woman-30s,
+     :prompt
+     "vertical 9:16 live-action, the woman peering into the dark vacant office floor from inside the elevator, plastic sheets over furniture, unsettling stillness",
+     :subtitle "空きフロアのはず。三日連続はおかしい。"}]}
+  {:seq 1,
+   :setting "9階に踏み出す",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :woman-30s,
+     :prompt
+     "vertical 9:16 live-action, the woman steps out holding her phone flashlight, beam crossing dusty desks, a faint warm light visible at the far corner, suspense",
+     :subtitle "……電気？ 奥だけ点いてる。"}
+    {:seq 1,
+     :duration 8,
+     :speaker :narrator-f,
+     :prompt
+     "vertical 9:16 live-action, the corner reveals a tiny tidy desk island: a lamp, a thermos, blankets, and a sleeping elderly security guard cat on the chair, tension breaking into warmth",
+     :subtitle "そこにいたのは、警備員室を追われた猫だった。"}]}
+  {:seq 2,
+   :setting "種明かし",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :guard,
+     :prompt
+     "vertical 9:16 live-action, an old security guard arrives from stairwell with cat food, embarrassed smile, scratching his head, warm lamp light",
+     :subtitle "『すまんね。餌の時間にな、エレベーターを呼ぶんだよ、こいつ』"}
+    {:seq 1,
+     :duration 8,
+     :speaker :woman-30s,
+     :prompt
+     "vertical 9:16 live-action, the woman crouching to pet the cat which presses the elevator call button with its paw proudly, laughing with relief",
+     :subtitle "ボタン押すの、あなただったの。"}
+    {:seq 2,
+     :duration 10,
+     :speaker :narrator-f,
+     :prompt
+     "vertical 9:16 live-action, elevator doors closing on the woman waving, cat sitting like a doorman beside the guard, cozy ending, cinematic symmetry",
+     :subtitle "9階には、夜勤の先輩がいる。"}]}]}

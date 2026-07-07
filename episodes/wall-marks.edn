@@ -1,0 +1,64 @@
+{:episode-id "wall-marks",
+ :title "壁の背くらべ",
+ :logline "引っ越し前夜。柱に残った背くらべの傷を、消すか残すかで親子が揉める。",
+ :genre "家族",
+ :premise :live-action,
+ :duration-target 65,
+ :scenes
+ [{:seq 0,
+   :setting "空っぽの実家・夜",
+   :shots
+   [{:seq 0,
+     :duration 7,
+     :speaker :daughter,
+     :prompt
+     "vertical 9:16 live-action, empty Japanese family house at night, moving boxes stacked, a woman in her 20s touches pencil marks and dates carved on a wooden pillar, nostalgic lighting",
+     :subtitle "百二センチ、小一。……ちっちゃ。"}
+    {:seq 1,
+     :duration 7,
+     :speaker :father,
+     :prompt
+     "vertical 9:16 live-action, a middle-aged father enters with a sander tool and sandpaper, practical expression, bare room with single light bulb",
+     :subtitle "買い手が決まった。傷は消さないとな。"}]}
+  {:seq 1,
+   :setting "柱をはさんで",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :daughter,
+     :prompt
+     "vertical 9:16 live-action, the daughter blocking the pillar with her body arms spread, half joking half serious, father sighing, family drama",
+     :subtitle "これ消すなら私を消してからにして。"}
+    {:seq 1,
+     :duration 8,
+     :speaker :father,
+     :prompt
+     "vertical 9:16 live-action, father lowering the sander, looking at the marks closely, his rough hand tracing the oldest lowest mark, emotional close-up",
+     :subtitle "……一番下のは、母さんが書いた。"}
+    {:seq 2,
+     :duration 8,
+     :speaker :daughter,
+     :prompt
+     "vertical 9:16 live-action, the daughter kneeling to see the lowest faded mark with a different handwriting, silence, warm dim light",
+     :subtitle "お母さんの字だ。"}]}
+  {:seq 2,
+   :setting "夜明け・玄関",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :father,
+     :prompt
+     "vertical 9:16 live-action, father carefully cutting out the section of pillar with the marks using a hand saw, sawdust in morning light, determined",
+     :subtitle "柱ごと持っていく。文句は言わせん。"}
+    {:seq 1,
+     :duration 9,
+     :speaker :daughter,
+     :prompt
+     "vertical 9:16 live-action, the daughter laughing and crying at once holding the cut wooden piece like treasure, moving truck visible through open door",
+     :subtitle "新しい家の、一番いい場所に飾ろう。"}
+    {:seq 2,
+     :duration 10,
+     :speaker :narrator-f,
+     :prompt
+     "vertical 9:16 live-action, the empty house from outside at sunrise, family bowing to it, the wooden piece under the father's arm, moving truck departing, cinematic wide",
+     :subtitle "家は手放しても、背くらべは続く。"}]}]}

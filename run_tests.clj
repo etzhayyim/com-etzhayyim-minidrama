@@ -6,7 +6,8 @@
             [minidrama.governor-contract-test]
             [minidrama.store-contract-test]
             [minidrama.operation-test]
-            [minidrama.mesh-manifest-test])
+            [minidrama.mesh-manifest-test]
+            [minidrama.episode-designs-test])
   (:gen-class))
 
 (defn -main [& _args]
@@ -14,6 +15,7 @@
              'minidrama.governor-contract-test
              'minidrama.store-contract-test
              'minidrama.operation-test
-             'minidrama.mesh-manifest-test)]
+             'minidrama.mesh-manifest-test
+             'minidrama.episode-designs-test)]
     (when (pos? (+ (:fail res 0) (:error res 0)))
       (System/exit 1))))

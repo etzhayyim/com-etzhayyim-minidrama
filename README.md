@@ -65,7 +65,34 @@ clojure -M:dev:run    # offline demo (mock advisor/publisher, MemStore)
 # theme 一発でミニドラマを製造 (actor→dougaka engine→announce, ADR-2607071500):
 bb scripts/produce-episode.bb --theme "屋上のラジオ体操" --duration 48            # preview (mp4 まで)
 bb scripts/produce-episode.bb --theme "…" --announce   # 公開 = per-episode sign-off
+
+# episodes/ の実写カタログ設計から製造 (手書き脚本も同じ DramaGovernor を通る):
+bb scripts/produce-episode.bb --plan episodes/rooftop-3min.edn [--announce]
 ```
+
+## episodes/ — 実写ミニドラマ設計カタログ (2026-07-07、実写前提)
+
+11 本の手書き設計 (48-73s 縦型 / shot list + 台詞 + :speaker ヒント /
+prompt は live-action cinematic)。全設計は `episode-designs-test` で
+DramaGovernor + フォーマット不変条件を全数検証される — **governor を通らない
+設計はカタログに置けない**。
+
+| slug | title | genre | 尺 |
+|---|---|---|---|
+| okigasa | 置き傘の返し方 | 恋愛/日常 | 60s |
+| receipt | 深夜のレシート | ミステリ | 70s |
+| alarm-ai | AIに叱られる朝 | SFコメディ | 60s |
+| rooftop-3min | 屋上、あと三分 | 青春 | 60s |
+| wall-marks | 壁の背くらべ | 家族 | 65s |
+| floor9 | 9階で止まる | ソフトホラー | 61s |
+| gobaku | 誤爆 | お仕事コメディ | 48s |
+| rain-books | 雨の日だけの古書店 | ファンタジー | 73s |
+| recipe | レシピの最後の一行 | 家族/グルメ | 64s |
+| teiki | 入れ替わった定期入れ | すれ違い恋愛 | 59s |
+| starlight-bus | 終バスの天体観測 | ヒューマン | 60s |
+
+実写前提のため、dougaka エンジン側は photoreal 系 checkpoint を
+`DOUGAKA_DEFAULT_CKPT` で指定して製造する (エンジン既定は env 差し替え可)。
 
 ## ON-MESH surface (reside facet, ADR-2607071500)
 

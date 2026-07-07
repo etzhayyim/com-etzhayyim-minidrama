@@ -1,0 +1,73 @@
+{:episode-id "rain-books",
+ :title "雨の日だけの古書店",
+ :logline "商店街の外れ、雨の日にだけ開く古書店がある。売っているのは、持ち主が読み終えられなかった本。",
+ :genre "ファンタジー",
+ :premise :live-action,
+ :duration-target 73,
+ :scenes
+ [{:seq 0,
+   :setting "雨の商店街",
+   :shots
+   [{:seq 0,
+     :duration 7,
+     :speaker :narrator-m,
+     :prompt
+     "vertical 9:16 live-action, rainy old Japanese shopping arcade, most shutters closed, one warm light spilling from a tiny bookshop, cinematic rain atmosphere",
+     :subtitle "その店は、雨の日にしか開かない。"}
+    {:seq 1,
+     :duration 7,
+     :speaker :student,
+     :prompt
+     "vertical 9:16 live-action, a university student ducks in from the rain shaking his umbrella, towering shelves of worn books, dust motes in lamplight",
+     :subtitle "うわ、こんな店あったんだ。"}]}
+  {:seq 1,
+   :setting "店内",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :owner,
+     :prompt
+     "vertical 9:16 live-action, an elderly shopkeeper with round glasses appears between shelves, gentle mysterious smile, warm tungsten light",
+     :subtitle "『うちの本はね、全部「途中」なんですよ』"}
+    {:seq 1,
+     :duration 8,
+     :speaker :student,
+     :prompt
+     "vertical 9:16 live-action, close-up of a book with a bookmark forever at page 143, faded name on the flyleaf, the student's fingers hesitating",
+     :subtitle "しおりが、挟まったまま……"}
+    {:seq 2,
+     :duration 8,
+     :speaker :owner,
+     :prompt
+     "vertical 9:16 live-action, the shopkeeper pouring tea, rain on the window behind, shelves stretching impossibly deep in soft focus",
+     :subtitle "『読み終えられなかった本は、続きを読む人を待つんです』"}]}
+  {:seq 2,
+   :setting "一冊との出会い",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :student,
+     :prompt
+     "vertical 9:16 live-action, the student freezes holding a familiar book, the flyleaf name matches his late grandfather's handwriting, emotional close-up",
+     :subtitle "……じいちゃんの字だ。"}
+    {:seq 1,
+     :duration 9,
+     :speaker :owner,
+     :prompt
+     "vertical 9:16 live-action, the shopkeeper nodding slowly, sliding the book gently toward the student across the counter, no money accepted, tender scene",
+     :subtitle "『では、続きはあなたの仕事だ』"}]}
+  {:seq 3,
+   :setting "雨上がり",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :student,
+     :prompt
+     "vertical 9:16 live-action, outside the arcade rain stopping, the student turns back and the shop is a shuttered empty storefront, wet pavement reflecting sky",
+     :subtitle "振り返ると、店はもうなかった。"}
+    {:seq 1,
+     :duration 10,
+     :speaker :narrator-m,
+     :prompt
+     "vertical 9:16 live-action, the student on a park bench under clearing sky reading from page 143, small smile, sunbeam through clouds, cinematic ending",
+     :subtitle "百四十三ページから、続きを読む。"}]}]}

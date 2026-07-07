@@ -1,0 +1,64 @@
+{:episode-id "starlight-bus",
+ :title "終バスの天体観測",
+ :logline "山道の終バス。乗客は受験生ひとり。運転手は、なぜか峠でバスを停めた。",
+ :genre "ヒューマン",
+ :premise :live-action,
+ :duration-target 60,
+ :scenes
+ [{:seq 0,
+   :setting "夜の山道・終バス",
+   :shots
+   [{:seq 0,
+     :duration 6,
+     :speaker :student-f,
+     :prompt
+     "vertical 9:16 live-action, nearly empty rural night bus interior, a high school girl with exam workbooks under a reading light, dark mountains outside, quiet cinematic",
+     :subtitle "模試、E判定。もう見たくない。"}
+    {:seq 1,
+     :duration 6,
+     :speaker :driver,
+     :prompt
+     "vertical 9:16 live-action, bus driver's eyes in the rear-view mirror glancing kindly at the passenger, dashboard glow, night driving",
+     :subtitle "『お客さん、ちょっとだけ寄り道していいかい』"}]}
+  {:seq 1,
+   :setting "峠の展望所",
+   :shots
+   [{:seq 0,
+     :duration 7,
+     :speaker :student-f,
+     :prompt
+     "vertical 9:16 live-action, the bus parked at a mountain overlook, headlights off, the girl stepping out uncertainly, city lights far below, night wind",
+     :subtitle "え、停まるの!? 終バスなのに!?"}
+    {:seq 1,
+     :duration 8,
+     :speaker :driver,
+     :prompt
+     "vertical 9:16 live-action, the driver leaning on the bus pointing upward, the girl looks up, an overwhelming starry sky over the ridge, breathtaking wide shot",
+     :subtitle "『今夜は流星群だ。五分だけ、営業time外』"}
+    {:seq 2,
+     :duration 8,
+     :speaker :student-f,
+     :prompt
+     "vertical 9:16 live-action, the girl's upturned face lit faintly by starlight, a meteor streaks, her eyes widening, emotional close-up",
+     :subtitle "……流れた。ほんとに流れた。"}]}
+  {:seq 2,
+   :setting "再出発",
+   :shots
+   [{:seq 0,
+     :duration 8,
+     :speaker :driver,
+     :prompt
+     "vertical 9:16 live-action, back in the bus, engine restarting, the driver holds up a worn photo of himself young in a university jacket, self-deprecating smile",
+     :subtitle "『わしも三浪してな。星見て戻ってきた口だ』"}
+    {:seq 1,
+     :duration 8,
+     :speaker :student-f,
+     :prompt
+     "vertical 9:16 live-action, the girl back in her seat opening the workbook again, pencil moving, reading light warm, resolve on her face",
+     :subtitle "願い事、『合格』って言いそびれたけど。"}
+    {:seq 2,
+     :duration 9,
+     :speaker :narrator-f,
+     :prompt
+     "vertical 9:16 live-action, the bus descending the mountain road, tail lights drawing a line under the starry sky, cinematic final wide shot",
+     :subtitle "終バスは、ちょっとだけ遠回りして走る。"}]}]}

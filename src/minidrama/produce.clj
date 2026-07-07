@@ -9,9 +9,13 @@
   1 — no plan file is written for a rejected episode.
 
   Usage: clojure -M:dev -m minidrama.produce <theme> [episode-id] [duration]
+         clojure -M:dev -m minidrama.produce --from episodes/<slug>.edn
+           (hand-authored design — STILL censored by the DramaGovernor via a
+            design-advisor, ADR-2607071300: 手書き脚本も同じ検閲を通る)
   Env:   MINIDRAMA_USE_LLM=1     use the Murakumo LLM advisor (deploy's wiring)
          MINIDRAMA_OLLAMA_URL / MINIDRAMA_OLLAMA_MODEL   as in minidrama.deploy"
-  (:require [clojure.java.io :as io]
+  (:require [clojure.edn]
+            [clojure.java.io :as io]
             [langgraph.graph :as g]
             [minidrama.advisor :as advisor]
             [minidrama.deploy :as deploy]
@@ -19,6 +23,18 @@
             [minidrama.publisher :as publisher]
             [minidrama.store :as store])
   (:gen-class))
+
+(defn design-advisor
+  "Advisor that proposes a fixed hand-authored design (episodes/*.edn) —
+  the DramaGovernor censors it exactly like a DramaLLM proposal."
+  [design]
+  (reify advisor/Advisor
+    (-plan [_ _ _]
+      {:summary (str "hand-authored design: " (:title design))
+       :rationale "episodes/ catalog design (operator-authored)"
+       :episode (select-keys design [:title :logline :scenes])
+       :effect :production
+       :confidence 0.9})))
 
 (defn produce-plan!
   "Run one theme through the actor. Returns
@@ -41,13 +57,20 @@
 (defn -main [& [theme episode-id duration]]
   (when-not (and theme (seq theme))
     (binding [*out* *err*]
-      (println "usage: clojure -M:dev -m minidrama.produce <theme> [episode-id] [duration]"))
+      (println "usage: clojure -M:dev -m minidrama.produce <theme>|--from <edn> [episode-id] [duration]"))
     (System/exit 1))
-  (let [episode-id (or episode-id (str "ep-" (System/currentTimeMillis)))
-        adv (when (= "1" (System/getenv "MINIDRAMA_USE_LLM"))
+  (let [design (when (= "--from" theme)
+                 (clojure.edn/read-string (slurp episode-id)))
+        episode-id (if design
+                     (:episode-id design)
+                     (or episode-id (str "ep-" (System/currentTimeMillis))))
+        adv (cond
+              design (design-advisor design)
+              (= "1" (System/getenv "MINIDRAMA_USE_LLM"))
               (advisor/llm-advisor (deploy/ollama-chat-model) {:max-tokens 1024}))
         {:keys [disposition plan basis]}
-        (produce-plan! {:theme theme :episode-id episode-id
+        (produce-plan! {:theme (if design (:title design) theme)
+                        :episode-id episode-id
                         :duration (some-> duration parse-long)
                         :advisor adv})]
     (if (= :commit disposition)

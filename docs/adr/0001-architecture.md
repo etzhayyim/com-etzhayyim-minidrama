@@ -43,7 +43,10 @@ containment + independent governor + append-only ledger
 - genapp-clj video エンジン（dougaka エンジン）統合 — shot 生成 → assemble
   （ffmpeg concat + 字幕）→ uploadBlob → announce
 - durable outer loop（`:agent.loop/*` 系 datom、kotoba code 型）
-- RAD identity journal（signing seat が使える時に
-  `etzhayyim/root 80-data/kotoba-rad/minidrama.identity.journal.edn` —
-  sng / kyoninka と同じ defer 前例。did:web:
-  `did:web:etzhayyim.github.io:com-etzhayyim-minidrama`）
+- ~~RAD identity journal~~ **完了 (2026-07-07)**: 署名付き journal 登録済み
+  （`etzhayyim/root 80-data/kotoba-rad/minidrama.identity.journal.edn`、
+  rid `bafkreiahidonufojwncmszfctuvbfp6ybpchmk7wkqtdd4mcmplgtwe2ay`、
+  actor member 鍵 = Keychain `etzhayyim.kotoba-rad/minidrama`）。did:web は
+  現行スキーム `did:web:etzhayyim.com:actor:minidrama` に RID 温存で移行済み
+  （free-form 解決 200 実測）。deferred 根拠だった signing tooling 待ちは
+  解消済み — 手順は etzhayyim/root `80-data/kotoba-rad/README.md`

@@ -63,6 +63,21 @@ clojure -M:dev:test   # cognitect test-runner
 clojure -M:dev:run    # offline demo (mock advisor/publisher, MemStore)
 ```
 
+## ON-MESH surface (reside facet, ADR-2607071500)
+
+`mesh/minidrama.app.edn` は kotoba WASM mesh 上の常駐面（kenchi-valuation 同型の
+split of duties）。drama pipeline（LLM 提案・governor・生成・publish）は
+OFF-MESH の JVM actor に残し、mesh guest は identity/liveness のみ扱う:
+
+- `mesh/drama_profile.clj` — `on-http /minidrama/profile` で actor の
+  identity record（handle / did / registry）を応答し、profile datom を assert
+- `mesh/drama_heartbeat.clj` — `on-tick` 毎時、resident-liveness datom を
+  append（fleet Datom log に as-of 履歴が残る）
+
+deploy は murakumo 側から: `kotoba-lang/murakumo` の `murakumo.app.edn` に
+fleet app として登録済み — `bb murakumo deploy mesh/minidrama.app.edn <node>`
+（1回）または `bb reconcile murakumo.app.edn --apply`（宣言的収束）。
+
 ## Related files
 
 - `src/minidrama/operation.cljc` — StateGraph
@@ -72,3 +87,5 @@ clojure -M:dev:run    # offline demo (mock advisor/publisher, MemStore)
 - `src/minidrama/publisher.cljc` — Publisher (Mock ‖ aozora follow-up)
 - `src/minidrama/phase.cljc` — phase 0 draft / 1 unlisted / 2 public+approval
 - `docs/adr/0001-architecture.md` — repo-local design note
+- `mesh/minidrama.app.edn` — ON-MESH surface manifest (reside facet)
+- `mesh/drama_profile.clj` / `mesh/drama_heartbeat.clj` — kotoba-clj mesh guests

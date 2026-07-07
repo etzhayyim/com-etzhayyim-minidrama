@@ -5,13 +5,15 @@
   (:require [clojure.test :refer [run-tests]]
             [minidrama.governor-contract-test]
             [minidrama.store-contract-test]
-            [minidrama.operation-test])
+            [minidrama.operation-test]
+            [minidrama.mesh-manifest-test])
   (:gen-class))
 
 (defn -main [& _args]
   (let [res (run-tests
              'minidrama.governor-contract-test
              'minidrama.store-contract-test
-             'minidrama.operation-test)]
+             'minidrama.operation-test
+             'minidrama.mesh-manifest-test)]
     (when (pos? (+ (:fail res 0) (:error res 0)))
       (System/exit 1))))

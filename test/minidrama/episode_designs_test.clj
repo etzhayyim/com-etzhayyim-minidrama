@@ -1,7 +1,12 @@
 (ns minidrama.episode-designs-test
   "episodes/ の実写ミニドラマ設計カタログを、DramaLLM 提案と同一の検閲
   (DramaGovernor) + フォーマット不変条件で全数検証する。設計が governor を
-  通らないなら、それは出荷できない設計である。"
+  通らないなら、それは出荷できない設計である。
+
+  episodes/*.edn は Datomic/Datascript tx-data ([{:db/id -1 :episode/...}])
+  として保存されている (edn-datomize.bb wrap-map, ns=episode)。design map
+  として消費するには reconstitute-design で :db/id を落とし :episode/ 名前空間
+  を剥がし、blob 化された :episode/scenes を元の入れ子データへ戻す。"
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
@@ -10,10 +15,20 @@
             [minidrama.governor :as governor]
             [minidrama.produce :as produce]))
 
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- reconstitute-design [tx-data]
+  (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+        (dissoc (first tx-data) :db/id)))
+
 (defn- designs []
   (->> (.listFiles (io/file "episodes"))
        (filter #(str/ends-with? (.getName %) ".edn"))
-       (map #(edn/read-string (slurp %)))
+       (map #(reconstitute-design (edn/read-string (slurp %))))
        (sort-by :episode-id)))
 
 (deftest catalog-has-about-ten-designs

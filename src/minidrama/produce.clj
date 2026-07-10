@@ -11,10 +11,14 @@
   Usage: clojure -M:dev -m minidrama.produce <theme> [episode-id] [duration]
          clojure -M:dev -m minidrama.produce --from episodes/<slug>.edn
            (hand-authored design — STILL censored by the DramaGovernor via a
-            design-advisor, ADR-2607071300: 手書き脚本も同じ検閲を通る)
+            design-advisor, ADR-2607071300: 手書き脚本も同じ検閲を通る。
+            episodes/*.edn は Datomic/Datascript tx-data として保存されている
+            (edn-datomize.bb wrap-map, ns=episode) — read-design が
+            :episode/ 名前空間を剥がし blob 化された :episode/scenes を
+            元の入れ子データへ戻す)
   Env:   MINIDRAMA_USE_LLM=1     use the Murakumo LLM advisor (deploy's wiring)
          MINIDRAMA_OLLAMA_URL / MINIDRAMA_OLLAMA_MODEL   as in minidrama.deploy"
-  (:require [clojure.edn]
+  (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [langgraph.graph :as g]
             [minidrama.advisor :as advisor]
@@ -23,6 +27,22 @@
             [minidrama.publisher :as publisher]
             [minidrama.store :as store])
   (:gen-class))
+
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn read-design
+  "episodes/<slug>.edn is a Datomic/Datascript tx-data vector
+  ([{:db/id -1 :episode/... ...}], edn-datomize.bb wrap-map ns=episode) —
+  reconstitute the original bare design map (strip :db/id + :episode/
+  namespace, unblob nested collections like :scenes)."
+  [path]
+  (let [tx (edn/read-string (slurp path))]
+    (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+          (dissoc (first tx) :db/id))))
 
 (defn design-advisor
   "Advisor that proposes a fixed hand-authored design (episodes/*.edn) —
@@ -60,7 +80,7 @@
       (println "usage: clojure -M:dev -m minidrama.produce <theme>|--from <edn> [episode-id] [duration]"))
     (System/exit 1))
   (let [design (when (= "--from" theme)
-                 (clojure.edn/read-string (slurp episode-id)))
+                 (read-design episode-id))
         episode-id (if design
                      (:episode-id design)
                      (or episode-id (str "ep-" (System/currentTimeMillis))))

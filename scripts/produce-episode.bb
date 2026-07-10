@@ -26,6 +26,22 @@
 
 (defn- flag? [args flag] (boolean (some #{flag} args)))
 
+(defn- unblob [v]
+  (if (string? v)
+    (try (let [parsed (edn/read-string v)] (if (coll? parsed) parsed v))
+         (catch Exception _ v))
+    v))
+
+(defn- read-plan-src
+  "episodes/<slug>.edn is a Datomic/Datascript tx-data vector
+  ([{:db/id -1 :episode/... ...}], edn-datomize.bb wrap-map ns=episode) —
+  reconstitute the bare design map (strip :db/id + :episode/ namespace,
+  unblob nested collections) so :episode-id/:title read the same as before."
+  [path]
+  (let [tx (edn/read-string (slurp path))]
+    (into {} (map (fn [[k v]] [(keyword (name k)) (unblob v)]))
+          (dissoc (first tx) :db/id))))
+
 (defn- run! [dir cmd]
   (let [{:keys [exit]} @(p/process cmd {:dir dir :inherit true})]
     (when-not (zero? exit)
@@ -39,11 +55,11 @@
                       (println "usage: bb scripts/produce-episode.bb (--theme \"…\" | --plan episodes/x.edn) [--id …] [--duration 60] [--announce] [--title …]"))
                     (System/exit 1)))
       id (or (opt args "--id")
-             (when plan-src (:episode-id (edn/read-string (slurp plan-src))))
+             (when plan-src (:episode-id (read-plan-src plan-src)))
              (str "ep-" (System/currentTimeMillis)))
       duration (opt args "--duration")
       title (or (opt args "--title")
-                (when plan-src (:title (edn/read-string (slurp plan-src))))
+                (when plan-src (:title (read-plan-src plan-src)))
                 theme)
       announce? (flag? args "--announce")
       here (str (fs/parent (fs/parent *file*)))          ; repo root

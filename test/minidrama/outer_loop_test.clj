@@ -42,3 +42,17 @@
                           "rooftop-3min"))))
     (testing "everything used → nil (catalog exhausted)"
       (is (nil? (ol/next-design {} (set designs)))))))
+
+(deftest merge-consumption-prefers-terminal-records
+  ;; observed live 2026-07-16: same-rkey overwrites read back non-deterministically
+  ;; while novelty is unfolded -- per-status rkeys + rank merge (done > held > started).
+  (let [tid "creatortick/x/2026-07-16/0"
+        started {:tick-id tid :status "started" :episode-id "a"}
+        held    {:tick-id tid :status "held" :episode-id "a"}
+        done    {:tick-id tid :status "done" :episode-id "a"}]
+    (is (= {tid done} (ol/merge-consumption [started done])))
+    (is (= {tid done} (ol/merge-consumption [done started])) "order-independent")
+    (is (= {tid started} (ol/merge-consumption [started])))
+    (is (= "done" (:status (get (ol/merge-consumption [started held done]) tid)))
+        "done outranks held (a successful retry supersedes an earlier hold)")
+    (is (= "held" (:status (get (ol/merge-consumption [held started]) tid))))))

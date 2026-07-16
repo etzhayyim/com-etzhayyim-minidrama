@@ -46,14 +46,22 @@
 (defn blob-url [pds cid]
   (str pds "/xrpc/com.atproto.sync.getBlob?cid=" cid))
 
+(def preview-collection
+  "Unlisted previews (phase 1, ADR-2607162200 Layer D): same record shape but
+  a non-feed collection — the appview video/author feeds only scan
+  app.bsky.feed.post, so a preview never surfaces publicly while still being
+  fetchable by URI for review."
+  "com.etzhayyim.apps.minidrama.preview")
+
 (defn announce-record
   "app.bsky.feed.post record announcing one produced episode — the embed is
-  app.aozora.embed.video {:src <getBlob URL>} (direct URL, /videos-playable)."
-  [{:keys [pds episode-id title text blob]
+  app.aozora.embed.video {:src <getBlob URL>} (direct URL, /videos-playable).
+  :visibility :unlisted swaps the collection to `preview-collection`."
+  [{:keys [pds episode-id title text blob visibility]
     :or {pds default-pds}}]
   (let [cid (get-in blob [:ref :$link])]
     {:$type "app.bsky.feed.post"
-     :collection "app.bsky.feed.post"
+     :collection (if (= :unlisted visibility) preview-collection "app.bsky.feed.post")
      :rkey episode-id
      :text (or text (str "【ミニドラマ座】『" title "』"))
      :embed {:$type "app.aozora.embed.video"
@@ -65,7 +73,7 @@
 (defn announce!
   "Upload the mp4 + create the announce post as the actor's own did:key.
   Returns {:blob-cid :post {:uri :cid}}."
-  [{:keys [pds identity path episode-id title text]
+  [{:keys [pds identity path episode-id title text visibility]
     :or {pds default-pds}}]
   (let [jwt (aozora/session-jwt! {:pds pds :identity identity
                                   :json-write json/write-str
@@ -75,22 +83,25 @@
                                       :json-write json/write-str
                                       :json-read json/read-str})
         rec (announce-record {:pds pds :episode-id episode-id
-                              :title title :text text :blob blob})]
+                              :title title :text text :blob blob
+                              :visibility visibility})]
     {:blob-cid (get-in blob [:ref :$link])
      :src (blob-url pds (get-in blob [:ref :$link]))
      :post (publisher/publish! pub rec)}))
 
-(defn -main [& [path episode-id title]]
+(defn -main [& [path episode-id title visibility]]
   (when-not (and path (.exists (io/file path)))
-    (binding [*out* *err*] (println "usage: clojure -M:dev -m minidrama.announce <episode.mp4> [episode-id] [title]"))
+    (binding [*out* *err*] (println "usage: clojure -M:dev -m minidrama.announce <episode.mp4> [episode-id] [title] [public|unlisted]"))
     (System/exit 1))
   (let [id (cacao/load-or-create-identity! ".minidrama/identity.edn")
         episode-id (or episode-id "demo-1")
         title (or title "デモ")
+        vis (if (= "unlisted" visibility) :unlisted :public)
         r (announce! {:identity id :path path :episode-id episode-id
-                      :title title
-                      :text (str "【ミニドラマ座】『" title "』（デモ公開）")})]
+                      :title title :visibility vis
+                      :text (str "【ミニドラマ座】『" title "』")})]
     (println "actor      :" (:did id))
+    (println "visibility :" (name vis))
     (println "blob cid   :" (:blob-cid r))
     (println "video src  :" (:src r))
     (println "post       :" (:post r))))

@@ -52,19 +52,45 @@
    (:ticks (getx (str pds "/xrpc/app.aozora.creator.getTicks?actor=" actor-slug
                       (when date (str "&date=" date)))))))
 
+(def ^:private terminal-status? #{"done" "held"})
+
+(def ^:private status-rank {"done" 2 "held" 1 "started" 0})
+
+(defn merge-consumption
+  "records (record values) -> {tick-id record}, highest status-rank wins
+  (done > held > started), order-independent. Each terminal status writes to
+  its OWN rkey precisely so no record ever overwrites a different status --
+  re-asserting the same uri makes reads non-deterministic while novelty is
+  unfolded (observed live 2026-07-16: a done tick read back as \"started\"),
+  which would reopen a finished tick after lease TTL and over-produce."
+  [values]
+  (reduce (fn [m v]
+            (if-let [tid (:tick-id v)]
+              (let [cur (m tid)]
+                (if (or (nil? cur)
+                        (> (status-rank (:status v) 0)
+                           (status-rank (:status cur) 0)))
+                  (assoc m tid v)
+                  m))
+              m))
+          {} values))
+
 (defn consumption
-  "Tick-consumption records from the actor's OWN repo → {tick-id record-value}."
+  "Tick-consumption records from the actor's OWN repo → {tick-id record},
+  terminal-preferring (see merge-consumption)."
   [pds did]
   (let [rs (:records (getx (str pds "/xrpc/com.atproto.repo.listRecords?repo=" did
                                 "&collection=" tick-collection "&limit=100")))]
-    (into {} (keep (fn [{:keys [value]}]
-                     (when-let [tid (:tick-id value)] [tid value]))
-                   rs))))
+    (merge-consumption (map :value rs))))
 
 (defn- record-consumption! [pub {:keys [tick episode-id status extra]}]
   (publisher/publish!
    pub (merge {:collection tick-collection
-               :rkey (str (:date tick) "-" (:slot tick))
+               ;; lease keeps the bare rkey; terminal state gets its own — a
+               ;; write NEVER lands on a uri that already has a different
+               ;; status (read-determinism, see merge-consumption).
+               :rkey (str (:date tick) "-" (:slot tick)
+                          (when (terminal-status? status) (str "-" status)))
                :$type tick-collection
                :tick-id (:id tick)
                :episode-id episode-id

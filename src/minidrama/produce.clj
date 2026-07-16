@@ -59,14 +59,20 @@
 (defn produce-plan!
   "Run one theme through the actor. Returns
   {:disposition :commit|:hold :plan <record|nil> :basis [...]}."
-  [{:keys [theme episode-id duration advisor phase]
+  [{:keys [theme episode-id duration advisor phase published-today]
     :or {phase 1}}]
   (let [s (store/seed-db)
         actor (op/build s (cond-> {:publisher (publisher/mock-publisher)}
                             advisor (assoc :advisor advisor)))
         r (g/run* actor {:request {:op :episode/plan :episode-id episode-id
                                    :theme theme :duration-target duration}
-                         :context {:actor-id "minidrama" :phase phase}}
+                         :context (cond-> {:actor-id "minidrama" :phase phase}
+                                    ;; deterministic rate-cap double-check
+                                    ;; (ADR-2607162200 Layer D①): the outer
+                                    ;; loop passes today's real post count so
+                                    ;; the governor's :rate-limited gate sees
+                                    ;; it even if tick emission misconfigures.
+                                    published-today (assoc :published-today published-today))}
                   {:thread-id episode-id})
         disposition (get-in r [:state :disposition])]
     {:disposition disposition
@@ -92,7 +98,9 @@
         (produce-plan! {:theme (if design (:title design) theme)
                         :episode-id episode-id
                         :duration (some-> duration parse-long)
-                        :advisor adv})]
+                        :advisor adv
+                        :published-today (some-> (System/getenv "MINIDRAMA_PUBLISHED_TODAY")
+                                                 parse-long)})]
     (if (= :commit disposition)
       (let [f (io/file ".minidrama/episodes" (str episode-id ".edn"))]
         (io/make-parents f)

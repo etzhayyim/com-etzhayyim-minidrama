@@ -79,19 +79,69 @@
        (map #(str/replace (.getName ^java.io.File %) #"\.edn$" ""))
        sort vec))
 
+(defn published-posts
+  "rkeys of the actor's existing app.bsky.feed.post records + how many were
+  created today — dedup source (a design already announced outside the tick
+  system, e.g. the rooftop-3min manual demo, must never be re-produced) and
+  the deterministic rate-cap input for the governor's :rate-limited gate."
+  [pds did today]
+  (let [rs (:records (getx (str pds "/xrpc/com.atproto.repo.listRecords?repo=" did
+                                "&collection=app.bsky.feed.post&limit=100")))]
+    {:rkeys (set (keep (fn [{:keys [uri]}] (last (str/split (str uri) #"/"))) rs))
+     :today (count (filter #(str/starts-with? (str (get-in % [:value :createdAt])) today)
+                           rs))}))
+
 (defn next-design
-  "First catalog design no consumption record has produced yet."
-  [consumed]
-  (let [used (set (keep :episode-id (vals consumed)))]
+  "First catalog design neither a consumption record nor an existing feed
+  post (dedup vs out-of-band announces) has used yet."
+  [consumed published-rkeys]
+  (let [used (into (set (keep :episode-id (vals consumed))) published-rkeys)]
     (first (remove used (catalog-designs)))))
 
+(def lease-ttl-minutes
+  "A consumption record stuck in \"started\" longer than this is treated as a
+  dead lease (crashed chain) and the tick becomes consumable again — the
+  re-consume overwrites the same rkey, so recovery is idempotent.
+  Override: MINIDRAMA_LEASE_TTL_MIN."
+  120)
+
+(defn- lease-expired? [record now-ms ttl-min]
+  (and (= "started" (:status record))
+       (when-let [ts (:createdAt record)]
+         (try (> (- now-ms (.toEpochMilli (java.time.Instant/parse ts)))
+                 (* ttl-min 60000))
+              (catch Exception _ false)))))
+
+(defn open-ticks
+  "Due ticks that are unconsumed OR whose \"started\" lease has expired."
+  [due consumed now-ms ttl-min]
+  (remove (fn [t]
+            (when-let [r (consumed (:id t))]
+              (not (lease-expired? r now-ms ttl-min))))
+          due))
+
+(defn- notify!
+  "Best-effort owner escalation on HOLD (macOS user notification). Never
+  fails the run — the consumption record is the durable escalation fact."
+  [msg]
+  (try (.waitFor (.start (ProcessBuilder.
+                          ^java.util.List
+                          ["osascript" "-e"
+                           (str "display notification \"" msg
+                                "\" with title \"minidrama outer-loop\"")])))
+       (catch Exception _ nil)))
+
 (defn- run-chain!
-  "produce → engine → announce via the existing orchestrator. Returns exit code."
-  [design-slug announce?]
-  (let [cmd (cond-> ["bb" "scripts/produce-episode.bb"
-                     "--plan" (str "episodes/" design-slug ".edn")]
-              announce? (conj "--announce"))
+  "produce → engine → announce via the existing orchestrator.
+  mode: :public | :unlisted | :none. args: extra CLI args (e.g. --theme).
+  published-today feeds the governor's deterministic rate cap. Returns exit."
+  [{:keys [plan-args mode published-today]}]
+  (let [cmd (cond-> (into ["bb" "scripts/produce-episode.bb"] plan-args)
+              (= :public mode)   (conj "--announce")
+              (= :unlisted mode) (conj "--announce-unlisted"))
         pb (doto (ProcessBuilder. ^java.util.List cmd) (.inheritIO))]
+    (when published-today
+      (.put (.environment pb) "MINIDRAMA_PUBLISHED_TODAY" (str published-today)))
     (.waitFor (.start pb))))
 
 (defn run-once!
@@ -102,32 +152,52 @@
         pub (aozora/aozora-publisher {:pds pds :identity id
                                       :json-write json/write-str
                                       :json-read json/read-str})
+        now-ms (System/currentTimeMillis)
         today (subs (str (java.time.Instant/now)) 0 10)
+        ttl (or (some-> (System/getenv "MINIDRAMA_LEASE_TTL_MIN") parse-long)
+                lease-ttl-minutes)
         due (vec (ticks pds today))
         consumed (consumption pds (:did id))
-        open (first (remove #(consumed (:id %)) due))
+        open (first (open-ticks due consumed now-ms ttl))
         ph (or (some-> (System/getenv "MINIDRAMA_PHASE") parse-long) 2)
-        announce? (phase/publish-allowed? ph #{:auto-publish})]
+        ;; publish mode: phase 2 + :auto-publish grant → public feed post;
+        ;; phase 1 → unlisted preview collection; phase 0 → produce only.
+        mode (cond
+               (phase/publish-allowed? ph #{:auto-publish}) :public
+               (phase/publish-allowed? ph #{}) :unlisted
+               :else :none)
+        pubs (published-posts pds (:did id) today)
+        hold! (fn [tick extra reason]
+                (record-consumption! pub (merge {:tick tick :status "held"} extra))
+                (notify! (str "HOLD " (:id tick) " — " reason))
+                (merge {:status :held :tick (:id tick)} (:extra extra)))]
     (cond
       (nil? open)
       {:status :idle :due (count due) :consumed (count consumed)}
 
       :else
-      (let [design (next-design consumed)]
-        (if-not design
-          (do (record-consumption! pub {:tick open :status "held"
-                                        :extra {:reason "catalog-exhausted"}})
-              {:status :held :tick (:id open) :reason :catalog-exhausted})
-          (do (record-consumption! pub {:tick open :episode-id design :status "started"})
-              (let [exit (run-chain! design announce?)]
+      (let [design (next-design consumed (:rkeys pubs))
+            llm? (= "1" (System/getenv "MINIDRAMA_USE_LLM"))
+            plan-args (cond
+                        design ["--plan" (str "episodes/" design ".edn")]
+                        ;; catalog dry + LLM enabled: themed plan, still
+                        ;; censored by the DramaGovernor like any proposal.
+                        llm? (let [auto-id (str "auto-" (:date open) "-" (:slot open))]
+                               ["--theme" (str "縦型ミニドラマ・" (:date open))
+                                "--id" auto-id]))
+            episode-id (or design (when llm? (str "auto-" (:date open) "-" (:slot open))))]
+        (if-not plan-args
+          (hold! open {:extra {:reason "catalog-exhausted"}} "catalog exhausted (LLM off)")
+          (do (record-consumption! pub {:tick open :episode-id episode-id :status "started"})
+              (let [exit (run-chain! {:plan-args plan-args :mode mode
+                                      :published-today (:today pubs)})]
                 (if (zero? exit)
-                  (do (record-consumption! pub {:tick open :episode-id design :status "done"
+                  (do (record-consumption! pub {:tick open :episode-id episode-id :status "done"
                                                 :extra {:phase ph :grant "auto-publish"
-                                                        :announced (boolean announce?)}})
-                      {:status :done :tick (:id open) :episode design :announced announce?})
-                  (do (record-consumption! pub {:tick open :episode-id design :status "held"
-                                                :extra {:exit exit}})
-                      {:status :held :tick (:id open) :episode design :exit exit})))))))))
+                                                        :mode (name mode)}})
+                      {:status :done :tick (:id open) :episode episode-id :mode mode})
+                  (hold! open {:episode-id episode-id :extra {:exit exit}}
+                         (str "chain exit " exit))))))))))
 
 (defn -main [& [cmd]]
   (if (= cmd "status")

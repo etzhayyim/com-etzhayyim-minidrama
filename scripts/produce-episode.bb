@@ -62,6 +62,9 @@
                 (when plan-src (:title (read-plan-src plan-src)))
                 theme)
       announce? (flag? args "--announce")
+      ;; unlisted preview (phase 1, ADR-2607162200 Layer D): announce into the
+      ;; non-feed preview collection instead of app.bsky.feed.post.
+      unlisted? (flag? args "--announce-unlisted")
       here (str (fs/parent (fs/parent *file*)))          ; repo root
       dougaka (or (System/getenv "DOUGAKA_DIR")
                   (str (fs/normalize (fs/path here "../../gftdcojp/ai-gftd-dougaka/clj"))))
@@ -75,10 +78,11 @@
   (println "=== 2/3 produce (dougaka engine: keyframes → ffmpeg) ===")
   (run! dougaka ["clojure" "-M:dev" "-m" "dougaka.pipeline" plan-file out-dir])
   (let [mp4 (str out-dir "/" id ".mp4")]
-    (if announce?
+    (if (or announce? unlisted?)
       (do (println "=== 3/3 announce (uploadBlob → app.aozora.embed.video → /videos) ===")
-          (run! here ["clojure" "-M:dev" "-m" "minidrama.announce" mp4 id title])
-          (println "done:" id "→ https://aozora.app/videos"))
+          (run! here ["clojure" "-M:dev" "-m" "minidrama.announce" mp4 id title
+                      (if unlisted? "unlisted" "public")])
+          (println "done:" id (if unlisted? "(unlisted preview)" "→ https://aozora.app/videos")))
       (do (println "=== preview (no --announce) ===")
           (println "video:" mp4)
           (let [plan (edn/read-string (slurp plan-file))]

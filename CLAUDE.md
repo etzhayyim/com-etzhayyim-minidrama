@@ -15,9 +15,16 @@ content-veto(Rider §2) / likeness / unprovenanced-asset / budget-exceeded /
 rate-limited は HELD — append-only 台帳に hold として記録され、SSoT には
 書かれない。`:commit` だけが Store 書込 + announce を行い、全 commit/hold は
 不変の台帳 fact。**public announcement (phase 2) は run context の
-`:approvals #{:publish}`（per-episode human sign-off）が無い限り行わない**
-（ADR-2607071300 gate ④ — 完全自律 publisher 群 (ADR-2606281500) とは
-minidrama 自身の ADR が意図的に differ）。unlisted (phase 1) までは自動可。
+approval grant（`:publish` = per-episode human sign-off、または
+`:auto-publish` = スケジュール outer loop の standing grant、
+superproject ADR-2607162200 Layer D）が無い限り行わない**。
+`:auto-publish` は 2026-07-10 恒久承認（公開コンテンツの発行も agent 判断で
+可）を反映した改訂で、初版 ADR-2607071300 gate ④ の「常に human 承認」を
+置き換える — ただし **DramaGovernor の HARD gate（content-veto / likeness /
+provenance / budget / rate-cap）が escalation 境界として不変**: HOLD は
+どの phase でも announce されず、owner へ surface される。どの grant で
+公開されたかは台帳 fact の `:publish-grant` に監査記録される。
+unlisted (phase 1) までは grant 無しで自動可。
 low-confidence は block せず `:low-confidence` タグで commit（透明性）。
 生成・合成はこの actor に実装しない — committed plan は genapp-clj 系
 video エンジン（dougaka エンジン）への発注書。

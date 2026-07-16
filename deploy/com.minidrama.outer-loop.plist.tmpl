@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- minidrama outer loop (ADR-0002 / superproject ADR-2607162200 Layer B).
+
+     Daily tick consumption: the aozora PDS cron emits creatortick datoms
+     (Layer A); this LaunchAgent runs `minidrama.outer-loop` once a day to
+     consume at most one — produce → dougaka engine → announce, behind the
+     DramaGovernor. Idempotent: an already-consumed tick day exits :idle, so
+     the schedule can be denser than the cadence without double-posting.
+
+     Install (murakumo deploy/*.plist.tmpl と同パターン):
+       sed -e "s|@REPO@|<checkout abs path>|g" \
+           -e "s|@DOUGAKA@|<ai-gftd-dougaka/clj abs path>|g" \
+           -e "s|@PATH@|$PATH|g" \
+         deploy/com.minidrama.outer-loop.plist.tmpl \
+         > ~/Library/LaunchAgents/com.minidrama.outer-loop.plist
+       launchctl load ~/Library/LaunchAgents/com.minidrama.outer-loop.plist
+     Remove:
+       launchctl unload ~/Library/LaunchAgents/com.minidrama.outer-loop.plist
+       rm ~/Library/LaunchAgents/com.minidrama.outer-loop.plist
+-->
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.minidrama.outer-loop</string>
+  <key>WorkingDirectory</key><string>@REPO@</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/usr/bin/env</string>
+    <string>clojure</string>
+    <string>-M:dev</string>
+    <string>-m</string>
+    <string>minidrama.outer-loop</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key><string>@PATH@</string>
+    <key>DOUGAKA_DIR</key><string>@DOUGAKA@</string>
+    <key>MINIDRAMA_PHASE</key><string>2</string>
+  </dict>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key><integer>9</integer>
+    <key>Minute</key><integer>30</integer>
+  </dict>
+  <key>StandardOutPath</key><string>@REPO@/.minidrama/outer-loop.log</string>
+  <key>StandardErrorPath</key><string>@REPO@/.minidrama/outer-loop.err.log</string>
+</dict>
+</plist>

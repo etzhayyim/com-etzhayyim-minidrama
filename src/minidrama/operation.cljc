@@ -97,6 +97,11 @@
           (let [ph       (:phase context phase/default-phase)
                 publish? (and (phase/publish-allowed? ph (:approvals context))
                               (= :production (:effect proposal)))
+                ;; audit which grant satisfied phase 2 (ADR-2607162200):
+                ;; :publish (human) beats :auto-publish in the record when both
+                ;; are present — the more explicit sign-off is the basis.
+                grant    (when publish?
+                           (first (filter (set (:approvals context)) [:publish :auto-publish])))
                 pub      (when publish? (publisher/publish! publisher record))
                 f        {:t           :committed
                           :op          (:op request)
@@ -105,6 +110,7 @@
                           :disposition :commit
                           :phase       ph
                           :published?  publish?
+                          :publish-grant grant
                           :pub         pub
                           :warnings    (:warnings record)
                           :shots       (:shots record)

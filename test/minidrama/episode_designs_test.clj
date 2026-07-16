@@ -31,8 +31,9 @@
        (map #(reconstitute-design (edn/read-string (slurp %))))
        (sort-by :episode-id)))
 
-(deftest catalog-has-about-ten-designs
-  (is (<= 10 (count (designs)) 12)))
+(deftest catalog-has-a-healthy-runway
+  ;; 1 episode/day で消費される — 補充で増える前提の band (catalog-refill)
+  (is (<= 10 (count (designs)) 30)))
 
 (deftest every-design-passes-the-drama-governor
   (doseq [{:keys [episode-id] :as d} (designs)]

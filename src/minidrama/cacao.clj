@@ -30,8 +30,14 @@
 
 (def ^:private cap->op {:cap/read "datom:read" :cap/transact "datom:transact" :cap/admin "tx:create"})
 
-(defn grant->resources [{:keys [cap scope]}]
-  [(str "kotoba://op/" (cap->op cap)) (str "kotoba://graph/" scope)])
+(defn grant->resources
+  "Resources for a grant. `:extra` carries additional resource URIs verbatim —
+  com.atproto.server.createAccount requires \"kotoba://can/aozora:repo:<did>\"
+  present before it will mint a did:web repo identity for us, and that shape is
+  `kotoba://can/…`, not the `kotoba://op/…` this grant vocabulary emits."
+  [{:keys [cap scope extra]}]
+  (into [(str "kotoba://op/" (cap->op cap)) (str "kotoba://graph/" scope)]
+        (or extra [])))
 
 (defn grant->payload [grant {:keys [iss aud nonce issued-at expiry domain version statement]
                              :or {domain "gftd.office" version "1"}}]

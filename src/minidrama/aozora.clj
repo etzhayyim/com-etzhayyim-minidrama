@@ -18,6 +18,7 @@
   approval (ADR-2607071300 gate ④)."
   (:require [clojure.string :as str]
             [minidrama.cacao :as cacao]
+            [minidrama.repo-signer :as repo-signer]
             [minidrama.publisher :as publisher])
   (:import [java.net URI]
            [java.net.http HttpClient HttpRequest HttpRequest$BodyPublishers
@@ -157,3 +158,110 @@
       (throw (ex-info "aozora createAccount failed"
                       {:status (:status resp) :body (:body resp)})))
     {:did (get body "did") :handle (get body "handle")}))
+
+;; ── federation: did:web repo identity + signed commits ───────────────────────
+;;
+;; Why any of this exists: records written through com.atproto.repo.createRecord
+;; persist and read back fine, but the repo never acquires a signed commit head,
+;; so com.atproto.sync.listRepos filters it out (aozora.pds.repo/list-repos only
+;; advertises a did whose head AND rev are present) and no Relay ever learns the
+;; repo exists. Verified on the live PDS: getLatestCommit answered RepoNotFound
+;; for this actor while its episodes were readable the whole time.
+;;
+;; Our did:key identity cannot carry a commit key: a commit signature must be
+;; secp256k1, our did:key is Ed25519 (a CACAO issuer has to be), and did:key has
+;; no DID document to publish a second key in. So the repo becomes a did:web
+;; whose CONTROLLER is the Ed25519 key we already hold — the wallet key is kept,
+;; not rotated; only a signing key is added (minidrama.repo-signer).
+
+(defn repo-did
+  "did:web:pds.aozora.app:<slug> — the identity shape createAccount accepts for
+  a federatable repo (its valid-repo-did? is
+  did:web:pds\\.aozora\\.app:[a-z0-9][a-z0-9-]{0,62})."
+  [slug]
+  (str "did:web:pds.aozora.app:" slug))
+
+(defn claim-repo!
+  "com.atproto.server.createAccount for a did:web repo controlled by our
+  Ed25519 identity, with `signer`'s public half as the repo signing key.
+
+  The CACAO must additionally carry kotoba://can/aozora:repo:<repo-did> or the
+  PDS refuses with AuthFailed — that resource is what authorises minting THIS
+  repo DID rather than any other. Re-running with the SAME identity is allowed
+  (idempotent, and how the signing key is rotated); a different key is refused,
+  which is what stops anyone else claiming our slug.
+  Returns {:did :handle :controllerDid :accessJwt}."
+  [{:keys [pds identity signer slug handle json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (assert (:did identity) ":identity is required")
+  (assert (:multikey signer) ":signer from repo-signer/load-or-create-key! is required")
+  (assert slug ":slug is required")
+  (let [rdid  (repo-did slug)
+        graph (cacao/canonical-graph (:did identity) cacao/default-db-name)
+        cacao (cacao/mint identity
+                          {:cap :cap/transact :scope graph
+                           :extra [(str "kotoba://can/aozora:repo:" rdid)]}
+                          {:aud pds :nonce (str (UUID/randomUUID))
+                           :issued-at (str (Instant/now))
+                           :expiry (str (.plusSeconds (Instant/now) 3600))})
+        resp  (http-fn {:url     (str pds "/xrpc/com.atproto.server.createAccount")
+                        :method  :post
+                        :headers {"Content-Type" "application/json"}
+                        :body    (json-write {:handle (or handle (str slug ".aozora.app"))
+                                              :cacao cacao
+                                              :repoDid rdid
+                                              :signingKey (:multikey signer)})})
+        body  (json-read (:body resp))]
+    (when-not (and (= 200 (:status resp)) (nil? (get body "error")))
+      (throw (ex-info "aozora claim-repo! failed"
+                      {:status (:status resp) :body (:body resp)})))
+    {:did (get body "did") :handle (get body "handle")
+     :controllerDid (get body "controllerDid") :accessJwt (get body "accessJwt")}))
+
+(defn publish-signing-key!
+  "app.aozora.repo.publishKey — register the signing key's PUBLIC half so the
+  PDS serves it at /<slug>/did.json. Without it didkey/resolve-pub-bytes has
+  nothing to verify our commits against and commitSigned fails closed."
+  [{:keys [pds jwt signer repo json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (let [resp (http-fn {:url     (str pds "/xrpc/app.aozora.repo.publishKey")
+                       :method  :post
+                       :headers {"Content-Type" "application/json"
+                                 "Authorization" (str "Bearer " jwt)}
+                       :body    (json-write {:repo repo :publicKeyHex (:pub-hex signer)})})
+        body (json-read (:body resp))]
+    (when-not (and (= 200 (:status resp)) (nil? (get body "error")))
+      (throw (ex-info "aozora publishKey failed"
+                      {:status (:status resp) :body (:body resp)})))
+    {:did (get body "did") :publicKeyMultibase (get body "publicKeyMultibase")}))
+
+(defn signed-write!
+  "Two-phase no-server-key write: prepareWrite → sign locally → commitSigned.
+
+  The record map is built ONCE and sent to both phases byte-identically; the
+  server re-derives the commit from it in phase 2, so any difference (a
+  regenerated timestamp is the easy mistake) changes the bytes under the
+  signature and the write is rejected as InvalidSignature.
+  Returns {:uri :cid :commit :rev}."
+  [{:keys [pds jwt signer repo collection rkey record json-write json-read http-fn]
+    :or   {pds default-pds http-fn jvm-http-fn}}]
+  (let [post (fn [nsid body]
+               (let [r (http-fn {:url (str pds "/xrpc/" nsid) :method :post
+                                 :headers {"Content-Type" "application/json"
+                                           "Authorization" (str "Bearer " jwt)}
+                                 :body (json-write body)})
+                     b (json-read (:body r))]
+                 (when-not (and (= 200 (:status r)) (nil? (get b "error")))
+                   (throw (ex-info (str "aozora " nsid " failed")
+                                   {:status (:status r) :body (:body r)})))
+                 b))
+        prep (post "app.aozora.repo.prepareWrite"
+                   (cond-> {:repo repo :collection collection :action "create" :record record}
+                     rkey (assoc :rkey rkey)))
+        unsigned (.decode (java.util.Base64/getDecoder) ^String (get prep "unsigned"))
+        sig  (repo-signer/sign-compact signer unsigned)
+        done (post "app.aozora.repo.commitSigned"
+                   {:repo repo :collection collection :rkey (get prep "rkey")
+                    :rev (get prep "rev") :sig sig :action "create" :record record})]
+    {:uri (get done "uri") :cid (get done "cid")
+     :commit (get done "commit") :rev (get done "rev")}))

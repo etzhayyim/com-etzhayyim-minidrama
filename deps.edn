@@ -4,6 +4,10 @@
  ;; (2026-07 org-wide *-clj rename: orgs/kotoba-lang/*)
  :deps {org.clojure/clojure {:mvn/version "1.12.0"}
         org.clojure/data.json {:mvn/version "2.5.1"} ; aozora publish + LLM json
+        ;; secp256k1 repo commit signing (minidrama.repo-signer). NOT available
+        ;; from SunEC on JDK 16+ — JDK 21 answers "Curve not supported:
+        ;; secp256k1" — so the curve has to come from BouncyCastle.
+        org.bouncycastle/bcprov-jdk18on {:mvn/version "1.78.1"}
         io.github.kotoba-lang/langgraph
         {:local/root "../../kotoba-lang/langgraph"}}
  :aliases
